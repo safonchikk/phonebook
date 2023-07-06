@@ -2,6 +2,7 @@ package ua.nikitasafonov.phonebook.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import ua.nikitasafonov.phonebook.CurrentUser;
 import ua.nikitasafonov.phonebook.model.AppUser;
@@ -12,13 +13,16 @@ import ua.nikitasafonov.phonebook.service.AppUserService;
 @CrossOrigin
 public class AppUserController {
     private final AppUserService service;
+    private final BCryptPasswordEncoder encoder;
 
-    public AppUserController(AppUserService service) {
+    public AppUserController(AppUserService service, BCryptPasswordEncoder encoder) {
         this.service = service;
+        this.encoder = encoder;
     }
 
     @PostMapping( "/register")
     public ResponseEntity<String> register(@RequestBody AppUser user){
+        user.setPassword(encoder.encode(user.getPassword()));
         boolean success = service.createUser(user);
         if (success){
             return ResponseEntity.status(HttpStatus.CREATED).body("Created successfully");
@@ -32,8 +36,7 @@ public class AppUserController {
     public ResponseEntity<String> login(@RequestBody AppUser user){
         boolean success = service.login(user);
         if (success){
-            //TODO gen token
-            CurrentUser.setCurrentUser(service.userByName(user.getUsername()));
+            CurrentUser.setCurrentUser(service.userByName(user.getUsername()).get());
             return ResponseEntity.status(HttpStatus.OK).body("Logged in successfully");
         }
         else{
@@ -43,7 +46,6 @@ public class AppUserController {
 
     @GetMapping("/logout")
     public ResponseEntity<String> logout(){
-        //TODO logout for actual security
         CurrentUser.setCurrentUser(null);
         return ResponseEntity.status(HttpStatus.OK).body("Logged out successfully");
     }

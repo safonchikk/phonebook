@@ -21,6 +21,7 @@ public class ContactController{
         this.service = service;
     }
 
+    //@PreAuthorize("hasRole('user')")
     @GetMapping("")
     public List<ContactDTO> myContacts(){
         return service.myContacts();

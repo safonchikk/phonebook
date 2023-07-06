@@ -10,7 +10,7 @@ public final class AppUser {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     private String username;
-    private String hashedPassword;
+    private String password;
 
     @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Contact> contacts;
@@ -18,19 +18,19 @@ public final class AppUser {
     public AppUser(
             Integer id,
             String username,
-            String hashedPassword
+            String password
     ) {
         this.id = id;
         this.username = username;
-        this.hashedPassword = hashedPassword;
+        this.password = password;
     }
 
     public AppUser(
             String username,
-            String hashedPassword
+            String password
     ) {
         this.username = username;
-        this.hashedPassword = hashedPassword;
+        this.password = password;
     }
 
     public AppUser() {}
@@ -51,12 +51,12 @@ public final class AppUser {
         this.username = username;
     }
 
-    public String getHashedPassword() {
-        return hashedPassword;
+    public String getPassword() {
+        return password;
     }
 
-    public void setHashedPassword(String hashedPassword) {
-        this.hashedPassword = hashedPassword;
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     public List<Contact> getContacts() {

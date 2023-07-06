@@ -11,6 +11,7 @@ import ua.nikitasafonov.phonebook.repository.PhoneRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Service
 public class ContactService {
@@ -26,6 +27,7 @@ public class ContactService {
     }
 
     public List<ContactDTO> myContacts(){
+
         List<ContactDTO> res = new ArrayList<>();
         for (Contact contact: repository.findAllByAppUser_Id(CurrentUser.getCurrentUser().getId())){
             res.add(contactToDTO(contact));
@@ -42,17 +44,22 @@ public class ContactService {
     }
 
     private boolean validate(Contact contact){
-        return true;
-    } //TODO
+        String regexPattern = ".{1,100}";
+        Pattern pattern = Pattern.compile(regexPattern);
+        return pattern.matcher(contact.getName()).matches();
+    }
     private boolean validate(Phone phone){
-        return true;
-    } //TODO
+        String regexPattern = "\\+?[0-9]{1,15}";
+        Pattern pattern = Pattern.compile(regexPattern);
+        return pattern.matcher(phone.getPhoneNumber()).matches();
+    }
     private boolean validate(Email email){
-        return true;
-    } //TODO
+        String regexPattern = "[\\w\\-.]+@[a-zA-Z\\-]+\\.\\w{2,}";
+        Pattern pattern = Pattern.compile(regexPattern);
+        return pattern.matcher(email.getAddress()).matches();
+    }
 
     private ContactDTO contactToDTO(Contact contact){
-
         List<Phone> phones = phonesOfContact(contact.getId());
         List<PhoneDTO> phoneDTOs = new ArrayList<>();
         for (Phone phone : phones) {
@@ -68,16 +75,37 @@ public class ContactService {
         return new ContactDTO(contact.getId(), contact.getName(), phoneDTOs, emailDTOs);
     }
 
+    private boolean checkContactToUser(Contact contact){
+        return contact.getAppUser().equals(CurrentUser.getCurrentUser());
+    }
+
+    private boolean checkContactToUser(Integer contactId){
+        Optional<Contact> contact = repository.findById(contactId);
+        return contact.map(value -> value.getAppUser().equals(CurrentUser.getCurrentUser())).orElse(false);
+    }
+
     public Optional<ContactDTO> contactById(Integer id) {
         Optional<Contact> contact = repository.findById(id);
+        if (contact.isEmpty()){
+            return Optional.empty();
+        }
+        if (!checkContactToUser(contact.get())){
+            return Optional.empty();
+        }
         return contact.map(this::contactToDTO);
     }
 
     public List<Phone> phonesOfContact(Integer contactId){
+        if (!checkContactToUser(contactId)){
+            return null;
+        }
         return phoneRepository.findAllByContact_Id(contactId);
     }
 
     public List<Email> emailsOfContact(Integer contactId){
+        if (!checkContactToUser(contactId)){
+            return null;
+        }
         return emailRepository.findAllByContact_Id(contactId);
     }
 
@@ -86,8 +114,7 @@ public class ContactService {
         if (optionalContact.isEmpty()){
             return Status.NOT_FOUND;
         }
-        Contact contact = optionalContact.get();
-        if (contact.getAppUser().getId() != CurrentUser.getCurrentUser().getId()){
+        if (!checkContactToUser(optionalContact.get())){
             return Status.AUTH_ERROR;
         }
         repository.deleteById(id);
@@ -98,8 +125,7 @@ public class ContactService {
         if (optionalPhone.isEmpty()){
             return Status.NOT_FOUND;
         }
-        Phone phone = optionalPhone.get();
-        if (phone.getContact().getAppUser().getId() != CurrentUser.getCurrentUser().getId()){
+        if (!checkContactToUser(optionalPhone.get().getContact())){
             return Status.AUTH_ERROR;
         }
         phoneRepository.deleteById(id);
@@ -110,8 +136,7 @@ public class ContactService {
         if (optionalEmail.isEmpty()){
             return Status.NOT_FOUND;
         }
-        Email email = optionalEmail.get();
-        if (email.getContact().getAppUser().getId() != CurrentUser.getCurrentUser().getId()){
+        if (!checkContactToUser(optionalEmail.get().getContact())){
             return Status.AUTH_ERROR;
         }
         emailRepository.deleteById(id);
@@ -147,6 +172,9 @@ public class ContactService {
         if (optionalContact.isEmpty()){
             return Status.NOT_FOUND;
         }
+        if (!checkContactToUser(optionalContact.get())){
+            return Status.AUTH_ERROR;
+        }
         return _addPhone(phone, optionalContact.get());
     }
 
@@ -171,6 +199,9 @@ public class ContactService {
         Optional<Contact> optionalContact = repository.findById(contactId);
         if (optionalContact.isEmpty()){
             return Status.NOT_FOUND;
+        }
+        if (!checkContactToUser(optionalContact.get())){
+            return Status.AUTH_ERROR;
         }
         return _addEmail(email, optionalContact.get());
     }
@@ -197,7 +228,9 @@ public class ContactService {
         if (existingContact == null) {
             return Status.NOT_FOUND;
         }
-
+        if (!checkContactToUser(existingContact)){
+            return Status.AUTH_ERROR;
+        }
         existingContact.setName(contact.getName());
         existingContact.setAppUser(CurrentUser.getCurrentUser());
 
