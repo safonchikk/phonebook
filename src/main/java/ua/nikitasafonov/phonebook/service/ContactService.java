@@ -1,9 +1,10 @@
 package ua.nikitasafonov.phonebook.service;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import ua.nikitasafonov.phonebook.CurrentUser;
 import ua.nikitasafonov.phonebook.Status;
 import ua.nikitasafonov.phonebook.model.*;
+import ua.nikitasafonov.phonebook.repository.AppUserRepository;
 import ua.nikitasafonov.phonebook.repository.ContactRepository;
 import ua.nikitasafonov.phonebook.repository.EmailRepository;
 import ua.nikitasafonov.phonebook.repository.PhoneRepository;
@@ -18,18 +19,24 @@ public class ContactService {
     private final ContactRepository repository;
     private final PhoneRepository phoneRepository;
     private final EmailRepository emailRepository;
+    private final AppUserRepository userRepository;
 
 
-    public ContactService(ContactRepository repository, PhoneRepository phoneRepository, EmailRepository emailRepository) {
+    public ContactService(ContactRepository repository, PhoneRepository phoneRepository, EmailRepository emailRepository, AppUserRepository userRepository) {
         this.repository = repository;
         this.phoneRepository = phoneRepository;
         this.emailRepository = emailRepository;
+        this.userRepository = userRepository;
+    }
+
+    public static String getCurrentUser() {
+        return SecurityContextHolder.getContext().getAuthentication().getName();
     }
 
     public List<ContactDTO> myContacts(){
 
         List<ContactDTO> res = new ArrayList<>();
-        for (Contact contact: repository.findAllByAppUser_Id(CurrentUser.getCurrentUser().getId())){
+        for (Contact contact: repository.findAllByAppUser_Username(getCurrentUser())){
             res.add(contactToDTO(contact));
         }
         return res;
@@ -37,7 +44,7 @@ public class ContactService {
 
     public List<SmallContactDTO> myContactsClean(){
         List<SmallContactDTO> res = new ArrayList<>();
-        for (Contact contact: repository.findAllByAppUser_Id(CurrentUser.getCurrentUser().getId())){
+        for (Contact contact: repository.findAllByAppUser_Username(getCurrentUser())){
             res.add(new SmallContactDTO(contact.getId(), contact.getName()));
         }
         return res;
@@ -76,12 +83,12 @@ public class ContactService {
     }
 
     private boolean checkContactToUser(Contact contact){
-        return contact.getAppUser().equals(CurrentUser.getCurrentUser());
+        return contact.getAppUser().getUsername().equals(getCurrentUser());
     }
 
     private boolean checkContactToUser(Integer contactId){
         Optional<Contact> contact = repository.findById(contactId);
-        return contact.map(value -> value.getAppUser().equals(CurrentUser.getCurrentUser())).orElse(false);
+        return contact.map(value -> value.getAppUser().getUsername().equals(getCurrentUser())).orElse(false);
     }
 
     public Optional<ContactDTO> contactById(Integer id) {
@@ -146,8 +153,8 @@ public class ContactService {
     public Status addContact(Contact contact) {
         Contact savedContact = new Contact();
         savedContact.setName(contact.getName());
-        savedContact.setAppUser(CurrentUser.getCurrentUser());
-        if (repository.existsByNameAndAppUser_Id(savedContact.getName(), CurrentUser.getCurrentUser().getId())) {
+        savedContact.setAppUser(userRepository.findByUsername(getCurrentUser()).orElseThrow());
+        if (repository.existsByNameAndAppUser_Username(savedContact.getName(), getCurrentUser())) {
             return Status.NOT_UNIQUE;
         }
         if (validate(savedContact)) {
@@ -157,7 +164,7 @@ public class ContactService {
             return Status.VALIDATION_ERROR;
         }
 
-        savedContact = repository.findByName(contact.getName());
+        savedContact = repository.findByNameAndAppUser_Username(contact.getName(), getCurrentUser());
         for (Phone phone: contact.getPhones()){
             _addPhone(phone, savedContact);
         }
@@ -232,7 +239,7 @@ public class ContactService {
             return Status.AUTH_ERROR;
         }
         existingContact.setName(contact.getName());
-        existingContact.setAppUser(CurrentUser.getCurrentUser());
+        existingContact.setAppUser(userRepository.findByUsername(getCurrentUser()).orElseThrow());
 
         existingContact.getPhones().clear();
         existingContact.getEmails().clear();
